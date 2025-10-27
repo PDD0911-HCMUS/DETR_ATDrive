@@ -163,7 +163,7 @@ def main(args):
     
     model.train()
     
-    img_path = '/home/duypd/ThisPC-DuyPC/DETR_ATDrive/data/MSCOCO/val2017/000000000872.jpg'
+    img_path = 'data/val2017/000000000872.jpg'
     im = Image.open(img_path).convert('RGB')
     
     img = transform(im).unsqueeze(0)

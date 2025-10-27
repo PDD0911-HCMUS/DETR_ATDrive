@@ -17,6 +17,7 @@ from .backbone import build_backbone
 from .segmentation import (DETRsegm, PostProcessPanoptic, PostProcessSegm,
                            dice_loss, sigmoid_focal_loss)
 from .transformer import build_transformer
+from .driveable_segment import DriveSeg
 
 
 class DETR(nn.Module):
@@ -32,29 +33,22 @@ class DETR(nn.Module):
             aux_loss: True if auxiliary decoding losses (loss at each decoder layer) are to be used.
         """
         super().__init__()
+        C_out = [512, 1024]
         self.num_queries = num_queries
         self.transformer = transformer
         hidden_dim = transformer.d_model
         nheads = transformer.nhead
-        self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
-        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
+        
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.query_embed_drive = nn.Embedding(num_queries, hidden_dim)
-        self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
-        # mask head
-        self.so_mask_conv = nn.Sequential(torch.nn.Upsample(size=(28, 28)),
-                                          nn.Conv2d(2, 64, kernel_size=3, stride=2, padding=3, bias=True),
-                                          nn.ReLU(inplace=True),
-                                          nn.BatchNorm2d(64),
-                                          nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
-                                          nn.Conv2d(64, 32, kernel_size=3, stride=1, padding=1, bias=True),
-                                          nn.ReLU(inplace=True),
-                                          nn.BatchNorm2d(32))
-        self.so_mask_fc = nn.Sequential(nn.Linear(8192, 512),
-                                        nn.ReLU(inplace=True),
-                                        nn.Linear(512, 128))
-        self.score_mlp = MLP(128, 128, 1, 2)
-        self.mask_head = MaskHeadSmallConv(hidden_dim + nheads, [1024, 512, 256], hidden_dim)
+        
+        self.input_spatial_S3_proj = nn.Conv2d(C_out[0], hidden_dim, kernel_size=1) #S3
+        self.input_spatial_S4_proj = nn.Conv2d(C_out[1], hidden_dim, kernel_size=1) #S4
+        self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1) #S5
+        
+        self.drive_seg = DriveSeg(hidden_dim, nheads)
+        self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
+        self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.backbone = backbone
         self.aux_loss = aux_loss
 
@@ -75,37 +69,38 @@ class DETR(nn.Module):
         """
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
+        
+        #=================BackBone Inference=================#
         features, pos = self.backbone(samples)
-        for i, item in enumerate(features):
-            print(f"at [{i}] size: {item.tensors.size()}")
-        
-        src, mask = features[-1].decompose()
+            
+        src3, mask3 = features[1].decompose() #C3
+        src4, mask4 = features[2].decompose() #C4
+        src, mask = features[-1].decompose() #C5
         assert mask is not None
-        src_proj = self.input_proj(src)
-        # hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
-        hs, _,  hm = self.transformer(src_proj, mask, self.query_embed.weight, self.query_embed_drive.weight, pos[-1])
-
-        #DRIVEABLE SEGMENTATION
-        h = self.so_mask_conv(hm.view(-1, 2, src.shape[-2],src.shape[-1])).view(hs.shape[0], hs.shape[1], hs.shape[2],-1)
-        h = self.so_mask_fc(h)[-1]
-        scores = self.score_mlp(h).squeeze(-1)
-        idx = scores.argmax(dim=-1)
-        hm_last = hm[-1] # last layer
-        B, nH, Q, HW = hm_last.shape
-        Henc, Wenc = src.shape[-2], src.shape[-1]
-        assert HW == Henc * Wenc
-        idx4g = idx.view(B, 1, 1, 1).expand(B, nH, 1, HW)    # [B, nH, 1, HW]
-        att_sel_flat = torch.gather(hm_last, dim=2, index=idx4g)   # [B, nH, 1, HW]
-        # reshape to 2D
-        att_sel = att_sel_flat.view(B, nH, 1, Henc, Wenc)    # [B, nH, 1, H, W]
-        # seg-head requiers [B, 1, nH, H, W] (Q=1 in front of nH):
-        att_for_head = att_sel.permute(0, 2, 1, 3, 4)        # [B, 1, nH, H, W]
-        seg_masks = self.mask_head(src_proj, att_for_head, [features[2].tensors, features[1].tensors, features[0].tensors])
         
+        src3_proj = self.input_spatial_S3_proj(src3) #S3
+        src4_proj = self.input_spatial_S4_proj(src4) #S4
+        src_proj = self.input_proj(src) #S5
+        
+        assert mask is not None
+        #=================End BackBone Inference=================#
+        
+        #=================Transformer Inference=================#
+        hs, _, hs_sp,  hm = self.transformer(src_proj, src3_proj, src4_proj, 
+                                      mask, mask3,
+                                      self.query_embed.weight, self.query_embed_drive.weight, 
+                                      pos[-1], pos[1])
+        print(f"hs size: {hs.size()}")
+        print(f"hs_sp size: {hs_sp.size()}")
+        print(f"hm size: {hm.size()}")
+        #=================End Transformer Inference=================#
+        
+        #=================Ouput Inference=================#
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
-        outputs_seg_masks = seg_masks.view(B, 1, seg_masks.shape[-2], seg_masks.shape[-1])
+        outputs_seg_masks = self.drive_seg(hs_sp, hm, src3, src3_proj, features)
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1], "pred_masks": outputs_seg_masks}
+        #=================End Ouput Inference=================#
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
         return out
@@ -142,9 +137,8 @@ class MaskHeadSmallConv(nn.Module):
 
     def __init__(self, dim, fpn_dims, context_dim):
         super().__init__()
-        print(context_dim)
+       
         inter_dims = [dim, context_dim // 2, context_dim // 4, context_dim // 8, context_dim // 16, context_dim // 64]
-        print(f"inter_dims: {inter_dims}")
         self.lay1 = torch.nn.Conv2d(dim, dim, 3, padding=1)
         self.gn1 = torch.nn.GroupNorm(8, dim)
         self.lay2 = torch.nn.Conv2d(dim, inter_dims[1], 3, padding=1)
