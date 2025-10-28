@@ -7,12 +7,8 @@ Copy-paste from torch.nn.Transformer with modifications:
     * extra LN at the end of encoder is removed
     * decoder returns a stack of activations from all decoding layers
 """
-import copy
-from typing import Optional, List
-
 import torch
-import torch.nn.functional as F
-from torch import nn, Tensor
+from torch import nn
 
 from .driveable_dec import DriveTransformerDecoder, DriveTransformerDecoderLayer
 from .entities_dec import EntitiesTransformerDecoder, EntitiesTransformerDecoderLayer

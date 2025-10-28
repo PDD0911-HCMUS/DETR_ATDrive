@@ -2,20 +2,14 @@
 """
 DETR model and criterion classes.
 """
-from typing import List
 import torch
 import torch.nn.functional as F
-from torch import Tensor, nn
+from torch import nn
 
 from util import box_ops
-from util.misc import (NestedTensor, nested_tensor_from_tensor_list,
-                       accuracy, get_world_size, interpolate,
-                       is_dist_avail_and_initialized)
+from util.misc import (NestedTensor, nested_tensor_from_tensor_list)
 
 from .backbone import build_backbone
-
-from .segmentation import (DETRsegm, PostProcessPanoptic, PostProcessSegm,
-                           dice_loss, sigmoid_focal_loss)
 from .transformer import build_transformer
 from .driveable_segment import DriveSeg
 
@@ -90,12 +84,9 @@ class DETR(nn.Module):
                                       mask, mask3,
                                       self.query_embed.weight, self.query_embed_drive.weight, 
                                       pos[-1], pos[1])
-        print(f"hs size: {hs.size()}")
-        print(f"hs_sp size: {hs_sp.size()}")
-        print(f"hm size: {hm.size()}")
         #=================End Transformer Inference=================#
         
-        #=================Ouput Inference=================#
+        #=================Ouput Inference=================#print(f"hs size: {hs.size()}")
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         outputs_seg_masks = self.drive_seg(hs_sp, hm, src3, src3_proj, features)
@@ -126,78 +117,7 @@ class MLP(nn.Module):
         for i, layer in enumerate(self.layers):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
-
-def _expand(tensor, length: int):
-    return tensor.unsqueeze(1).repeat(1, int(length), 1, 1, 1).flatten(0, 1)
-class MaskHeadSmallConv(nn.Module):
-    """
-    Simple convolutional head, using group norm.
-    Upsampling is done using a FPN approach
-    """
-
-    def __init__(self, dim, fpn_dims, context_dim):
-        super().__init__()
-       
-        inter_dims = [dim, context_dim // 2, context_dim // 4, context_dim // 8, context_dim // 16, context_dim // 64]
-        self.lay1 = torch.nn.Conv2d(dim, dim, 3, padding=1)
-        self.gn1 = torch.nn.GroupNorm(8, dim)
-        self.lay2 = torch.nn.Conv2d(dim, inter_dims[1], 3, padding=1)
-        self.gn2 = torch.nn.GroupNorm(8, inter_dims[1])
-        self.lay3 = torch.nn.Conv2d(inter_dims[1], inter_dims[2], 3, padding=1)
-        self.gn3 = torch.nn.GroupNorm(8, inter_dims[2])
-        self.lay4 = torch.nn.Conv2d(inter_dims[2], inter_dims[3], 3, padding=1)
-        self.gn4 = torch.nn.GroupNorm(8, inter_dims[3])
-        self.lay5 = torch.nn.Conv2d(inter_dims[3], inter_dims[4], 3, padding=1)
-        self.gn5 = torch.nn.GroupNorm(8, inter_dims[4])
-        self.out_lay = torch.nn.Conv2d(inter_dims[4], 1, 3, padding=1)
-
-        self.dim = dim
-
-        self.adapter1 = torch.nn.Conv2d(fpn_dims[0], inter_dims[1], 1)
-        self.adapter2 = torch.nn.Conv2d(fpn_dims[1], inter_dims[2], 1)
-        self.adapter3 = torch.nn.Conv2d(fpn_dims[2], inter_dims[3], 1)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_uniform_(m.weight, a=1)
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x: Tensor, bbox_mask: Tensor, fpns: List[Tensor]):
-        x = torch.cat([_expand(x, bbox_mask.shape[1]), bbox_mask.flatten(0, 1)], 1)
-        x = self.lay1(x)
-        x = self.gn1(x)
-        x = F.relu(x)
-        x = self.lay2(x)
-        x = self.gn2(x)
-        x = F.relu(x)
-
-        cur_fpn = self.adapter1(fpns[0])
-        if cur_fpn.size(0) != x.size(0):
-            cur_fpn = _expand(cur_fpn, x.size(0) // cur_fpn.size(0))
-        x = cur_fpn + F.interpolate(x, size=cur_fpn.shape[-2:], mode="nearest")
-        x = self.lay3(x)
-        x = self.gn3(x)
-        x = F.relu(x)
-
-        cur_fpn = self.adapter2(fpns[1])
-        if cur_fpn.size(0) != x.size(0):
-            cur_fpn = _expand(cur_fpn, x.size(0) // cur_fpn.size(0))
-        x = cur_fpn + F.interpolate(x, size=cur_fpn.shape[-2:], mode="nearest")
-        x = self.lay4(x)
-        x = self.gn4(x)
-        x = F.relu(x)
-
-        cur_fpn = self.adapter3(fpns[2])
-        if cur_fpn.size(0) != x.size(0):
-            cur_fpn = _expand(cur_fpn, x.size(0) // cur_fpn.size(0))
-        x = cur_fpn + F.interpolate(x, size=cur_fpn.shape[-2:], mode="nearest")
-        x = self.lay5(x)
-        x = self.gn5(x)
-        x = F.relu(x)
-
-        x = self.out_lay(x)
-        return x
-
+    
 class PostProcess(nn.Module):
     """ This module converts the model's output into the format expected by the coco api"""
     @torch.no_grad()
@@ -229,15 +149,7 @@ class PostProcess(nn.Module):
         return results
 
 def build(args):
-    # the `num_classes` naming here is somewhat misleading.
-    # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
-    # is the maximum id for a class in your dataset. For example,
-    # COCO has a max_obj_id of 90, so we pass `num_classes` to be 91.
-    # As another example, for a dataset that has a single class with id 1,
-    # you should pass `num_classes` to be 2 (max_obj_id + 1).
-    # For more details on this, check the following discussion
-    # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
-    num_classes = 20 if args.dataset_file != 'coco' else 91
+    num_classes = 9
 
     backbone = build_backbone(args)
 
@@ -250,14 +162,7 @@ def build(args):
         num_queries=args.num_queries,
         aux_loss=args.aux_loss,
     )
-    if args.masks:
-        model = DETRsegm(model, freeze_detr=(args.frozen_weights is not None))
-    
     postprocessors = {'bbox': PostProcess()}
-    if args.masks:
-        postprocessors['segm'] = PostProcessSegm()
-        if args.dataset_file == "coco_panoptic":
-            is_thing_map = {i: i <= 90 for i in range(201)}
-            postprocessors["panoptic"] = PostProcessPanoptic(is_thing_map, threshold=0.85)
+    # postprocessors['segm'] = PostProcessSegm()
 
     return model, postprocessors

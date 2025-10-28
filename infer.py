@@ -40,7 +40,7 @@ COLORS = [[0.000, 0.447, 0.741], [0.850, 0.325, 0.098], [0.929, 0.694, 0.125],
 
 # standard PyTorch mean-std input image normalization
 transform = T.Compose([
-    T.Resize(640),
+    T.Resize([640,640]),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
@@ -162,20 +162,23 @@ def main(args):
     model, _ = build_model(args)
     
     model.train()
-    
-    img_path = 'data/val2017/000000000872.jpg'
+    #data/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg
+    #data/coco/val2017/000000000872.jpg
+    img_path = 'data/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg'
     im = Image.open(img_path).convert('RGB')
     
     img = transform(im).unsqueeze(0)
     
-    img = img.repeat(2, 1, 1, 1)
+    # img = img.repeat(2, 1, 1, 1)
+    
+    print(img.size())
     
     outputs = model(img)       
     
     print(outputs.keys())
     for item in outputs.keys():
         if(item != 'aux_outputs'):
-            print(outputs[item].size())
+            print(f"{item} size: {outputs[item].size()}")
     
     
 if __name__ == '__main__':
