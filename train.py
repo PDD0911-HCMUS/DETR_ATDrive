@@ -106,9 +106,9 @@ if __name__=="__main__":
     args = parser.parse_args()
     args.masks = False
     if args.output_dir:
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-        
-    output_dir = Path(args.output_dir)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir = Path(args.output_dir) / timestamp
+        output_dir.mkdir(parents=True, exist_ok=True)
         
     batch_size = args.batch_size
     dataset_train = build(image_set="train")
@@ -118,9 +118,6 @@ if __name__=="__main__":
     sampler_train = RandomSampler(dataset_train)
     sampler_val = SequentialSampler(dataset_valid)
     batch_sampler_train = BatchSampler(sampler_train, batch_size, drop_last=True)
-
-    
-    
 
     # # --- Visualize ---
     # # --- Chuẩn bị ảnh ---
@@ -170,12 +167,6 @@ if __name__=="__main__":
     optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
                                   weight_decay=args.weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
-    
-    metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
-    header = 'Epoch: [{}]'.format(20)
-    print_freq = 1
     
     print("Start training")
     start_time = time.time()
