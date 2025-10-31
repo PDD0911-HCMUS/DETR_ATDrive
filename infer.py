@@ -4,11 +4,11 @@ import math
 from PIL import Image
 import requests
 import matplotlib.pyplot as plt
-
+import torch.nn.functional as F
+import numpy as np
 # import ipywidgets as widgets
 from IPython.display import display, clear_output
 from models import build_model
-from models.segmentation import DETRsegm
 import torch
 from torch import nn
 from torchvision.models import resnet50
@@ -17,20 +17,7 @@ torch.set_grad_enabled(False)
 
 # COCO classes
 CLASSES = [
-    'N/A', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-    'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A',
-    'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse',
-    'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack',
-    'umbrella', 'N/A', 'N/A', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis',
-    'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove',
-    'skateboard', 'surfboard', 'tennis racket', 'bottle', 'N/A', 'wine glass',
-    'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich',
-    'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
-    'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table', 'N/A',
-    'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-    'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A',
-    'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
-    'toothbrush'
+    'N/A', 'person', "car", "rider", "bus", "truck", "bike", "motor", "traffic light", "traffic sign"
 ]
 
 # colors for visualization
@@ -66,12 +53,92 @@ def plot_results(pil_img, prob, boxes):
     for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), colors):
         ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
                                    fill=False, color=c, linewidth=3))
-        cl = p.argmax()
+        cl = p.argmax() - 1
         text = f'{CLASSES[cl]}: {p[cl]:0.2f}'
         ax.text(xmin, ymin, text, fontsize=15,
                 bbox=dict(facecolor='yellow', alpha=0.5))
     plt.axis('off')
     plt.show()
+
+# COLORS, CLASSES, v.v. giữ nguyên như bạn đang dùng
+
+def plot_results_with_heatmap(
+    pil_img,
+    prob,                 # Tensor [N, num_classes] (đã softmax hoặc logits đều OK)
+    boxes,                # Tensor [N, 4] ở pixel xyxy
+    heatmap=None,         # Tensor logits hoặc prob của mask: [Hh,Wh] hoặc [1,1,Hh,Wh]
+    thr=0.5,              # ngưỡng binary cho mask
+    overlay_alpha=0.4,    # độ trong suốt heatmap/mask
+    cmap='jet',
+    show_binary=False     # nếu True: overlay thêm binary mask (thr)
+):
+    """
+    - Vẽ bounding boxes + nhãn (giống plot_results cũ).
+    - Nếu có heatmap: overlay heatmap lên ảnh.
+      heatmap có thể là logits (chưa sigmoid) hoặc prob (0..1), hàm tự nhận dạng.
+    - Option show_binary=True để overlay binary mask (thr).
+    """
+    # Chuẩn bị ảnh và axes
+    fig = plt.figure(figsize=(16, 10))
+    plt.imshow(pil_img)
+    ax = plt.gca()
+
+    # 1) Vẽ heatmap nếu có
+    if heatmap is not None:
+        hm = heatmap
+        if isinstance(hm, torch.Tensor):
+            hm = hm.detach().cpu()
+            # chấp nhận [H,W] hoặc [1,1,H,W]
+            if hm.dim() == 4:
+                hm = hm.squeeze(0).squeeze(0)  # -> [H,W]
+            # nếu là logits: đưa về prob
+            if hm.max() > 1.0 or hm.min() < 0.0:
+                hm = hm.sigmoid()
+            hm_np = hm.numpy()  # [H,W] 0..1
+        else:
+            hm_np = hm  # numpy 2D
+
+        # resize heatmap về kích thước ảnh PIL
+        H, W = pil_img.size[1], pil_img.size[0]  # PIL: (W,H)
+        hm_t = torch.from_numpy(hm_np).float().unsqueeze(0).unsqueeze(0)  # [1,1,Hh,Wh]
+        hm_up = F.interpolate(hm_t, size=(H, W), mode='bilinear', align_corners=False).squeeze().numpy()
+
+        # overlay heatmap
+        plt.imshow(hm_up, cmap=cmap, alpha=overlay_alpha, vmin=0.0, vmax=1.0)
+
+        # overlay binary mask (tuỳ chọn)
+        if show_binary:
+            mask_bin = (hm_up > thr).astype(np.float32)
+            # dùng một lớp overlay xanh lá mờ
+            green = np.zeros((H, W, 3), dtype=np.float32)
+            green[..., 1] = 1.0
+            plt.imshow(green, alpha=overlay_alpha * mask_bin, interpolation='nearest')
+
+    # 2) Vẽ boxes + nhãn
+    colors = COLORS * 100
+    prob_soft = prob
+    if isinstance(prob_soft, torch.Tensor):
+        # nếu là logits: softmax
+        if prob_soft.max() > 1.0 or prob_soft.min() < 0.0:
+            prob_soft = prob_soft.softmax(-1)
+        prob_soft = prob_soft.detach().cpu()
+
+    for p, (xmin, ymin, xmax, ymax), c in zip(prob_soft, boxes.tolist(), colors):
+        ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
+                                   fill=False, color=c, linewidth=3))
+        # background là lớp cuối → bỏ lớp bg
+        p_no_bg = p[:-1] if p.numel() == len(CLASSES) + 1 else p
+        cl = int(p_no_bg.argmax())
+        score = float(p_no_bg[cl])
+        name = CLASSES[cl] if 0 <= cl < len(CLASSES) else f'cls{cl}'
+        text = f'{name}: {score:0.2f}'
+        ax.text(xmin, ymin, text, fontsize=15,
+                bbox=dict(facecolor='yellow', alpha=0.5))
+
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
     
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
@@ -160,8 +227,9 @@ def get_args_parser():
 def main(args):
     
     model, _ = build_model(args)
-    
-    model.train()
+    state_dict = torch.load("checkpoint.pth", map_location='cpu', weights_only=False)
+    model.load_state_dict(state_dict['model'])
+    model.eval()
     #data/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg
     #data/coco/val2017/000000000872.jpg
     img_path = 'data/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg'
@@ -179,7 +247,39 @@ def main(args):
     for item in outputs.keys():
         if(item != 'aux_outputs'):
             print(f"{item} size: {outputs[item].size()}")
+            
+    probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
+    keep = probas.max(-1).values > 0.7
     
+    print(outputs['pred_masks'])
+    logits = outputs["pred_masks"][0, 0]         # [160,160], logits
+    heat = logits.sigmoid().cpu()                # [160,160], 0..1
+    # convert boxes from [0; 1] to image scales
+    bboxes_scaled = rescale_bboxes(outputs['pred_boxes'][0, keep], im.size)
+    
+    scores = probas[keep]
+    # plot_results(im, scores, bboxes_scaled)
+    plot_results_with_heatmap(
+        pil_img=im,
+        prob=scores,         # tensor [N,C]
+        boxes=bboxes_scaled,   # tensor [N,4]
+        heatmap=outputs["pred_masks"],  # [Hh,Wh] hoặc [1,1,Hh,Wh]
+        thr=0.45,
+        overlay_alpha=0.45,
+        cmap='jet',
+        show_binary=False
+    )
+    
+
+class Infer():
+    def __init__(self, check_point):
+        super().__init__()
+        
+        self.classes = ['N/A', 'person', "car", "rider", "bus", "truck", "bike", "motor", "traffic light", "traffic sign"]
+        self.state_dict = torch.load(check_point, map_location='cpu', weights_only=False)
+    
+    def _load_model():
+        pass
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('DETR inference', parents=[get_args_parser()])

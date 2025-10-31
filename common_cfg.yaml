@@ -1,0 +1,10 @@
+common:
+  lr: 1e-4
+  lr_backbone: 1e-5
+  batch_size: 32
+  weight_decay: 1e-4
+  epochs: 100
+  lr_drop: 200
+  clip_max_norm: 0.1
+  num_workers: 2
+  
