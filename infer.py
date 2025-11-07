@@ -227,12 +227,12 @@ def get_args_parser():
 def main(args):
     
     model, _ = build_model(args)
-    state_dict = torch.load("checkpoint.pth", map_location='cpu', weights_only=False)
+    state_dict = torch.load("checkpoint0099.pth", map_location='cpu', weights_only=False)
     model.load_state_dict(state_dict['model'])
     model.eval()
     #data/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg
     #data/coco/val2017/000000000872.jpg
-    img_path = 'data/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg'
+    img_path = 'data/BDD/bdd100k/bdd100k_images_100k/val/b1c9c847-3bda4659.jpg'
     im = Image.open(img_path).convert('RGB')
     
     img = transform(im).unsqueeze(0)
