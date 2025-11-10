@@ -1,10 +1,30 @@
 common:
-  lr: 1e-4
-  lr_backbone: 1e-5
-  batch_size: 32
-  weight_decay: 1e-4
-  epochs: 100
-  lr_drop: 200
-  clip_max_norm: 0.1
-  num_workers: 2
+  training:
+    lr: 1.0e-4
+    
+    batch_size: 2
+    weight_decay: 1.0e-4
+    epochs: 100
+    lr_drop: 50
+    clip_max_norm: 0.1
+    num_workers: 2
+
+    print_freq_train: 100
+    print_freq_val: 50
+  
+  data:
+    root_image: data/BDD/bdd100k/bdd100k_images_100k
+    root_anno: data/BDD/bdd100k_labels_release
+    root_seg: data/BDD/bdd100k_labels_release/segment
+    size: 640 
+  
+  device: cpu
+  start_epoch: 0
+  epochs: 150
+
+  output_dir: workdirs
+
+
+
+
   

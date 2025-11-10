@@ -1,0 +1,54 @@
+[Logger] Training logs will be saved to: workdirs/20251110_145248/logs/train_20251110_145248.log
+[Logger] Starting training at 2025-11-10 14:53:02
+Traceback (most recent call last):
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/train.py", line 215, in <module>
+    train.run()
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/train.py", line 164, in run
+    train_stats = trainer.train_one_epoch(
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/trainer.py", line 56, in train_one_epoch
+    outputs = self.model(samples)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/models/detr.py", line 83, in forward
+    hs, _, hs_sp,  hm = self.transformer(src_proj, src3_proj, src4_proj, 
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/models/transformer.py", line 66, in forward
+    memory, sp_memory = self.hybrid_encoder(src, src3, src4, mask, pos_embed)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/models/hybrid_encoder.py", line 207, in forward
+    sp_src = self.sp_fusion(src3, src4)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/models/hybrid_encoder.py", line 114, in forward
+    b2 = self.branch2_rep(b2)                            # [B, C, H3, W3]
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/container.py", line 244, in forward
+    input = module(input)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/ThisPC-DuyPC/DETR_ATDrive/models/hybrid_encoder.py", line 18, in forward
+    out = self.bn3(self.conv3(x)) + self.bn1(self.conv1(x)) + x
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 548, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/duypd/.local/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 543, in _conv_forward
+    return F.conv2d(
+KeyboardInterrupt
