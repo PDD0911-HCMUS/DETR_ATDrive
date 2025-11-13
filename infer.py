@@ -157,7 +157,7 @@ class InferHyDA():
 
         outputs = model(img)
         probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
-        keep = probas.max(-1).values > 0.7
+        keep = probas.max(-1).values > 0.8
         logits = outputs["pred_masks"][0, 0]         # [160,160], logits
         bboxes_scaled = self.rescale_bboxes(outputs['pred_boxes'][0, keep], im.size)
         scores = probas[keep]
@@ -167,7 +167,7 @@ class InferHyDA():
             prob=scores,         # tensor [N,C]
             boxes=bboxes_scaled,   # tensor [N,4]
             heatmap=outputs["pred_masks"],  # [Hh,Wh] hoặc [1,1,Hh,Wh]
-            thr=0.45,
+            thr=0.5,
             overlay_alpha=0.45,
             cmap='jet',
             show_binary=False
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     # criterion_yml = "criterion_cfg.yaml"
     state_dict = "checkpoint.pth"
 
-    image_file = 'data/BDD/bdd100k/bdd100k_images_100k/val/fe1cc363-a3f36598.jpg'
+    image_file = 'data/bdd100k/bdd100k_images_100k/val/ca6412a2-3db85e24.jpg'
 
     infer = InferHyDA(
         model_yml, 
