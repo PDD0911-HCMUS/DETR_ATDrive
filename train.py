@@ -79,14 +79,17 @@ class Train:
     def _build_data(self):
         common_cfg = self.common_cfg['common']
         batch_size = common_cfg['training']['batch_size']
+        size = common_cfg['data']['size']
         dataset_train = build("train", 
                               common_cfg['data']['root_image'],
                               common_cfg['data']['root_anno'],
-                              common_cfg['data']['root_seg'])
+                              common_cfg['data']['root_seg'],
+                              size)
         dataset_valid = build("val",
                               common_cfg['data']['root_image'],
                               common_cfg['data']['root_anno'],
-                              common_cfg['data']['root_seg'])
+                              common_cfg['data']['root_seg'],
+                              size)
         print(f"dataset_valid_length: {dataset_valid.__len__()}")
         print(f"dataset_train_length: {dataset_train.__len__()}")
         sampler_train = RandomSampler(dataset_train)
