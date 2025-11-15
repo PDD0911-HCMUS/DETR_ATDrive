@@ -180,7 +180,7 @@ if __name__ == '__main__':
     # criterion_yml = "criterion_cfg.yaml"
     state_dict = "checkpoint.pth"
 
-    image_file = 'data/bdd100k/bdd100k_images_100k/val/ca6412a2-3db85e24.jpg'
+    image_file = 'data/BDD/bdd100k/bdd100k_images_100k/val/ca6412a2-3db85e24.jpg'
 
     infer = InferHyDA(
         model_yml, 

@@ -129,7 +129,7 @@ class InferHyDAONNX():
 
 if __name__ == "__main__":
     onnx_path = "hyda_r50_e29.onnx"
-    img_path = "data/bdd100k/bdd100k_images_100k/val/ca6412a2-3db85e24.jpg"
+    img_path = "data/BDD/bdd100k/bdd100k_images_100k/val/ca3165e0-949dbfc8.jpg"
 
     infer = InferHyDAONNX(onnx_path)
     infer.run(img_path)
