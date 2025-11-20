@@ -1,9 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-"""
-COCO dataset which returns image_id for evaluation.
 
-Mostly copy-paste from https://github.com/pytorch/vision/blob/13b35ff/references/detection/coco_utils.py
-"""
 from pathlib import Path
 from PIL import Image
 import numpy as np
@@ -13,7 +8,6 @@ import torchvision
 from pycocotools import mask as coco_mask
 import os
 import datasets.transforms as T
-# from config_run import *
 
 class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, ann_file, image_set, root_image_seg_folder, transforms):

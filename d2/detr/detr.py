@@ -16,7 +16,7 @@ from detectron2.structures import Boxes, ImageList, Instances, BitMasks, Polygon
 from detectron2.utils.logger import log_first_n
 from fvcore.nn import giou_loss, smooth_l1_loss
 from models.backbone import Joiner
-from models.detr import DETR, SetCriterion
+from models.hyda import DETR, SetCriterion
 from models.matcher import HungarianMatcher
 from models.position_encoding import PositionEmbeddingSine
 from models.transformer import Transformer

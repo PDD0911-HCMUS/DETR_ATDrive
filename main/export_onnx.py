@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import yaml
-from models.detr import build_model
+from models.hyda import build_model
 class Wrapper(nn.Module):
     def __init__(self, model):
         super().__init__()
@@ -36,8 +36,6 @@ class ExportONNX():
         
         self.onnx_path = onnx_path
         self.opset = opset
-        
-        
         
     def _load_cfg(self, yml_file):
         with open(yml_file, 'r') as f:

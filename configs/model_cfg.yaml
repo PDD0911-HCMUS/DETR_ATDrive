@@ -21,3 +21,4 @@ model:
 
   num_queries: 100
   aux_loss: true # false only for inference
+  training: true # false only for inference

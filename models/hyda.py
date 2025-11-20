@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from models.aux_hub import AuxHubHead
 from util import box_ops
 from util.misc import (NestedTensor, nested_tensor_from_tensor_list)
 
@@ -16,7 +17,7 @@ from .driveable_segment import DriveSeg
 
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
-    def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False):
+    def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False, training=True):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -44,6 +45,11 @@ class DETR(nn.Module):
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)
         self.backbone = backbone
+        self.training = training
+        if self.training:
+            self.aux_hub_head = AuxHubHead(in_channels=hidden_dim,
+                                       num_classes=num_classes + 1,
+                                       hidden_dim=hidden_dim)
         self.aux_loss = aux_loss
 
     def forward(self, samples: NestedTensor):
@@ -94,6 +100,12 @@ class DETR(nn.Module):
         #=================End Ouput Inference=================#
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
+            
+        if self.training:
+            aux_logits, aux_boxes = self.aux_hub_head(src4_proj)
+            out["aux_s4_logits"] = aux_logits   # [B, N4, num_classes]
+            out["aux_s4_boxes"]  = aux_boxes    # [B, N4, 4]
+            
         return out
 
     @torch.jit.unused
@@ -163,7 +175,8 @@ def build_model(
         pre_norm,
         num_queries,
         aux_loss,
-        num_classes
+        num_classes,
+        training
     ):
 
     backbone = build_backbone(hidden_dim, 
@@ -187,6 +200,7 @@ def build_model(
         num_classes=num_classes,
         num_queries=num_queries,
         aux_loss=aux_loss,
+        training=training
     )
     postprocessors = {'bbox': PostProcess()}
 

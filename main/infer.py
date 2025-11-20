@@ -5,7 +5,7 @@ import numpy as np
 # import ipywidgets as widgets
 from IPython.display import display, clear_output
 import yaml
-from models.detr import build_model
+from models.hyda import build_model
 import torch
 import torchvision.transforms as T
 torch.set_grad_enabled(False)
