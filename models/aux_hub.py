@@ -5,7 +5,7 @@ class AuxHubHead(nn.Module):
     Auxiliary Hub Supervision Head đặt trên S4:
     - Input:  S4 [B, C, H4, W4]
     - Output:
-        aux_logits: [B, H4*W4, num_classes]
+        aux_logits: [B, H4*W4, num_classes + 1]
         aux_boxes:  [B, H4*W4, 4]  (cx, cy, w, h, normalized 0–1)
     """
     def __init__(self, in_channels: int, num_classes: int, hidden_dim: int = 256):
@@ -28,12 +28,12 @@ class AuxHubHead(nn.Module):
         s4: [B, C, H4, W4]
         """
         B, C, H, W = s4.shape
-        x = self.proj(s4)          # [B, hidden_dim, H, W]
-        x = x.flatten(2)           # [B, hidden_dim, H*W]
-        x = x.transpose(1, 2)      # [B, H*W, hidden_dim]
+        x = self.proj(s4) # [B, hidden_dim, H, W]
+        x = x.flatten(2) # [B, hidden_dim, H*W]
+        x = x.transpose(1, 2) # [B, H*W, hidden_dim]
 
-        aux_logits = self.cls_head(x)      # [B, N4, num_classes]
-        aux_boxes  = self.box_head(x)      # [B, N4, 4]
-        aux_boxes  = aux_boxes.sigmoid()   # normalize to [0, 1]
+        aux_logits = self.cls_head(x) # [B, N4, num_classes]
+        aux_boxes  = self.box_head(x) # [B, N4, 4]
+        aux_boxes  = aux_boxes.sigmoid() # normalize [0, 1]
 
         return aux_logits, aux_boxes

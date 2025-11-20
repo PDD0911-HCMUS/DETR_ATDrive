@@ -95,6 +95,7 @@ class Train:
             cfg['transformer']['dec_layers'],
             cfg['transformer']['pre_norm'],
             cfg['num_queries'],
+            cfg['num_drive_queries'],
             cfg['aux_loss'],
             cfg['num_classes'],
             cfg['training']
@@ -405,7 +406,7 @@ class Train:
                     }, checkpoint_path)
 
             # Evaluate (chỉ cần coco_evaluator ở main process; Trainer bên trong có thể đã xử lý)
-            test_stats, coco_evaluator = trainer.evaluate(data_loader_val)
+            test_stats, coco_evaluator = trainer.evaluate(data_loader_val, self.common_cfg['common']['training']['print_freq_val'])
 
             log_stats = {
                 **{f'train_{k}': v for k, v in train_stats.items()},

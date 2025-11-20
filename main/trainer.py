@@ -81,7 +81,7 @@ class Trainer:
             metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
             metric_logger.update(class_error=loss_dict_reduced['class_error'])
             metric_logger.update(lr=self.optimizer.param_groups[0]["lr"])
-            break
+            # break
         # end epoch
         metric_logger.synchronize_between_processes()
         print("Averaged stats:", metric_logger)
@@ -91,6 +91,7 @@ class Trainer:
     def evaluate(
         self,
         data_loader: Iterable,
+        print_freq
     ) -> Tuple[Dict[str, float], Optional[CocoEvaluator]]:
         self.model.eval()
         self.criterion.eval()
@@ -110,7 +111,7 @@ class Trainer:
                 output_dir=os.path.join(self.output_dir, "panoptic_eval"),
             )
 
-        for i, (samples, targets) in enumerate(metric_logger.log_every(data_loader, 50, header)):
+        for i, (samples, targets) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
             samples = samples.to(self.device)
             targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
 
@@ -148,7 +149,7 @@ class Trainer:
                     res_pano[j]["image_id"] = image_id
                     res_pano[j]["file_name"] = file_name
                 panoptic_evaluator.update(res_pano)
-            break
+            # break
         # gather
         metric_logger.synchronize_between_processes()
         print("Averaged stats:", metric_logger)

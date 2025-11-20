@@ -15,9 +15,9 @@ from .transformer import build_transformer
 from .driveable_segment import DriveSeg
 
 
-class DETR(nn.Module):
+class HyDA(nn.Module):
     """ This is the DETR module that performs object detection """
-    def __init__(self, backbone, transformer, num_classes, num_queries, aux_loss=False, training=True):
+    def __init__(self, backbone, transformer, num_classes, num_queries, num_drive_queries, aux_loss=False, training=True):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -29,16 +29,15 @@ class DETR(nn.Module):
         """
         super().__init__()
         C_out = [512, 1024]
-        self.num_queries = num_queries
         self.transformer = transformer
         hidden_dim = transformer.d_model
         nheads = transformer.nhead
         
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
-        self.query_embed_drive = nn.Embedding(num_queries, hidden_dim)
+        self.query_embed_drive = nn.Embedding(num_drive_queries, hidden_dim)
         
-        self.input_spatial_S3_proj = nn.Conv2d(C_out[0], hidden_dim, kernel_size=1) #S3
-        self.input_spatial_S4_proj = nn.Conv2d(C_out[1], hidden_dim, kernel_size=1) #S4
+        self.input_spatial_proj = nn.Conv2d(C_out[0], hidden_dim, kernel_size=1) #S3
+        self.input_hub_proj = nn.Conv2d(C_out[1], hidden_dim, kernel_size=1) #S4
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1) #S5
         
         self.drive_seg = DriveSeg(hidden_dim, nheads)
@@ -78,8 +77,8 @@ class DETR(nn.Module):
         src, mask = features[-1].decompose() #C5
         assert mask is not None
         
-        src3_proj = self.input_spatial_S3_proj(src3) #S3
-        src4_proj = self.input_spatial_S4_proj(src4) #S4
+        src3_proj = self.input_spatial_proj(src3) #S3
+        src4_proj = self.input_hub_proj(src4) #S4
         src_proj = self.input_proj(src) #S5
         
         assert mask is not None
@@ -174,6 +173,7 @@ def build_model(
         dec_layers, 
         pre_norm,
         num_queries,
+        num_drive_queries,
         aux_loss,
         num_classes,
         training
@@ -194,11 +194,12 @@ def build_model(
         dec_layers, 
         pre_norm)
 
-    model = DETR(
+    model = HyDA(
         backbone,
         transformer,
         num_classes=num_classes,
         num_queries=num_queries,
+        num_drive_queries=num_drive_queries,
         aux_loss=aux_loss,
         training=training
     )
